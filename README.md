@@ -1,4 +1,4 @@
-# tango-symcon
+# tango-snap7
 
 scadawire/tango-controls integration to Siemens Simatec S7 devices.
 
