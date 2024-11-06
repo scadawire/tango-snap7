@@ -172,7 +172,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         offset = int(match.group(3))
         if(not match.group(4) is None and match.group(4) != ""):
             suboffset = int(match.group(4))
-        return {area: area, subarea: subarea, offset: offset, suboffset: suboffset}
+        return {"area": area, "subarea": subarea, "offset": offset, "suboffset": suboffset}
     
     def read_dynamic_attr(self, attr):
         name = attr.get_name()
