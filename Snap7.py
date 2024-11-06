@@ -94,7 +94,7 @@ class Snap7(Device, metaclass=DeviceMeta):
     # TODO sync all memory in one go on fixed cron
         
     
-    def read_byte_from_area_offset_size(self, area, subarea, offset, size)
+    def read_byte_from_area_offset_size(self, area, subarea, offset, size):
         if(area == "DB"): # DB memory
             self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
@@ -102,7 +102,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(area == "A" or area == "Q"): # output memory
             self.client.ab_read(offset, size)
     
-    def write_byte_to_area_offset_size(self, area, subarea, offset, data)
+    def write_byte_to_area_offset_size(self, area, subarea, offset, data):
         if(area == "DB"): # DB memory
             self.client.db_write(subarea, offset, data)
         elif(area == "E" or area == "I"): # input memory
