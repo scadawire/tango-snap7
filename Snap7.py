@@ -26,6 +26,7 @@ from threading import Thread
 import datetime
 import snap7
 import re
+from json import JSONDecodeError
 
 class Snap7(Device, metaclass=DeviceMeta):
     pass
