@@ -162,7 +162,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         subarea = 0
         offset = 0
         match = re.match(r"^([A-Za-z]+)(\d*)\.(\d+)(?:\.(\d+))?$", register)
-        if !match:
+        if (not match):
             raise Exception("given register not supported " + register)
 
         area = match.group(1)
