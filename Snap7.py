@@ -138,9 +138,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevBoolean): # attention! overrides full byte
             return 1
         elif(variableType == CmdArgType.DevString):
-            data = bytearray(customLength)
-            self.client.set_string(data, 0, variable)
-        
+            return customLength        
     
     def variable_to_bytedata(self, variable, variableType):
         customLength = 0
@@ -159,7 +157,8 @@ class Snap7(Device, metaclass=DeviceMeta):
             snap7.util.set_string(data, 0, variable)
         else:
             raise Exception("unsupported variable type " + variableType)
-                
+        return data
+        
     def get_register_parts(self, register):    
         area = "DB"
         subarea = 0
