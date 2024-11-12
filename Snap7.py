@@ -1,19 +1,31 @@
 # see also: https://python-snap7.readthedocs.io/en/latest/installation.html
 # see also: https://python-snap7.readthedocs.io/en/latest/API/client.html#snap7.client.Client
 # see also: https://python-snap7.readthedocs.io/en/latest/API/util.html#snap7.util.set_real
-
+#
+# install:
 # pip install python-snap7[cli]
 # pip install python-snap7
-
+# 
+# run server:
 # python3 -m snap7.server
-
+# 
+# client - read data:
 # python3
 # import snap7
 # client = snap7.client.Client()
 # client.connect("127.0.0.1", 0, 0, 1102)
 # client.get_connected()
 # data = client.db_read(1, 0, 4)
-# data[3] = 0b00000001
+# snap7.util.get_real(data, 0)
+#
+# client - write data:
+# python3
+# import snap7
+# client = snap7.client.Client()
+# client.connect("127.0.0.1", 0, 0, 1102)
+# client.get_connected()
+# data = bytearray(4)
+# snap7.util.set_real(data, 0, 1234.5678)
 # client.db_write(1, 0, data)
 
 import time
