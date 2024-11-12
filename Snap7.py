@@ -1,5 +1,6 @@
 # see also: https://python-snap7.readthedocs.io/en/latest/installation.html
 # see also: https://python-snap7.readthedocs.io/en/latest/API/client.html#snap7.client.Client
+# see also: https://python-snap7.readthedocs.io/en/latest/API/util.html#snap7.util.set_real
 
 # pip install python-snap7[cli]
 # pip install python-snap7
@@ -112,15 +113,15 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     def bytedata_to_variable(self, data, variableType, offset = 0, suboffset = 0):
         if(variableType == CmdArgType.DevFloat):
-            return self.client.get_real(data, offset)
+            return snap7.util.get_real(data, offset)
         elif(variableType == CmdArgType.DevDouble):
-            return self.client.get_lreal(data, offset)
+            return snap7.util.get_lreal(data, offset)
         elif(variableType == CmdArgType.DevLong):
-            return self.client.get_dint(data, offset)
+            return snap7.util.get_dint(data, offset)
         elif(variableType == CmdArgType.DevBoolean):
-            return self.client.get_bool(data, offset, suboffset)
+            return snap7.util.get_bool(data, offset, suboffset)
         elif(variableType == CmdArgType.DevString):
-            return self.client.get_string(data, offset)
+            return snap7.util.get_string(data, offset)
         else:
             raise Exception("unsupported variable type " + variableType)
     
@@ -145,15 +146,15 @@ class Snap7(Device, metaclass=DeviceMeta):
             customLength = len(variable) + 1
         data = bytearray(self.bytes_per_variable_type(variableType, customLength))
         if(variableType == CmdArgType.DevFloat):
-            self.client.set_real(data, 0, variable)
+            snap7.util.set_real(data, 0, variable)
         elif(variableType == CmdArgType.DevDouble):
-            self.client.set_lreal(data, 0, variable)
+            snap7.util.set_lreal(data, 0, variable)
         elif(variableType == CmdArgType.DevLong): # 32bit int
-            self.client.set_dint(data, 0, variable)
+            snap7.util.set_dint(data, 0, variable)
         elif(variableType == CmdArgType.DevBoolean): # attention! overrides full byte
-            self.client.set_bool(data, 0, variable)
+            snap7.util.set_bool(data, 0, variable)
         elif(variableType == CmdArgType.DevString):
-            self.client.set_string(data, 0, variable)
+            snap7.util.set_string(data, 0, variable)
         else:
             raise Exception("unsupported variable type " + variableType)
                 
