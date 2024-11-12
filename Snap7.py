@@ -111,11 +111,13 @@ class Snap7(Device, metaclass=DeviceMeta):
     
     def read_byte_from_area_offset_size(self, area, subarea, offset, size):
         if(area == "DB"): # DB memory
-            self.client.db_read(subarea, offset, size)
+            return self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
-            self.client.eb_read(offset, size)
+            return self.client.eb_read(offset, size)
         elif(area == "A" or area == "Q"): # output memory
-            self.client.ab_read(offset, size)
+            return self.client.ab_read(offset, size)
+        else:
+            raise Exception("unsupported area type " + area)
     
     def write_byte_to_area_offset_size(self, area, subarea, offset, data):
         if(area == "DB"): # DB memory
@@ -124,6 +126,8 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.client.eb_write(offset, data)
         elif(area == "A" or area == "Q"): # output memory
             self.client.ab_write(offset, data)
+        else:
+            raise Exception("unsupported area type " + area)
 
     def bytedata_to_variable(self, data, variableType, offset = 0, suboffset = 0):
         if(variableType == CmdArgType.DevFloat):
