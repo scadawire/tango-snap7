@@ -63,6 +63,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         register_parts = self.get_register_parts(register)
         self.add_attribute(attr, r_meth=self.read_dynamic_attr, w_meth=self.write_dynamic_attr)
         self.dynamicAttributes[topic] = {"variableType": variableType, "register": register, "register_parts": register_parts, "value": 0 }
+        print("added dynamic attribute " + topic)
+        print(self.dynamicAttributes[topic])
 
     def stringValueToVarType(self, variable_type_name) -> CmdArgType:
         if(variable_type_name == "DevBoolean"):
