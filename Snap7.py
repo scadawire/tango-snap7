@@ -183,8 +183,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         if(variableType == CmdArgType.DevString):
             customLength = 254 # see also https://python-snap7.readthedocs.io/en/stable/API/util.html#snap7.util.set_string
         size = self.bytes_per_variable_type(variableType, customLength)
-        data = self.read_byte_from_area_offset_size(register_parts.area, register_parts.subarea, register_parts.offset, size)
-        value = self.bytedata_to_variable(data, variableType, 0, register_parts.suboffset)
+        data = self.read_byte_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
+        value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
         self.debug_stream("read value " + str(name) + ": " + str(value))
         attr.set_value(value)
 
@@ -196,12 +196,12 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     @command(dtype_in=[str])
     def publish(self, name):
-        value = self.dynamicAttributes[name].value
+        value = self.dynamicAttributes[name]["value"]
         register_parts = self.dynamicAttributes[name]["register_parts"]
         variableType = self.dynamicAttributes[name]["variableType"]
         self.info_stream("Publish variable " + str(name) + ": " + str(value))
         data = self.variable_to_bytedata(value, variableType)
-        self.write_byte_to_area_offset_size(register_parts.area, register_parts.subarea, register_parts.offset, data)
+        self.write_byte_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
 
     def reconnect(self):
         self.client.connect(self.host, self.rack, self.slot, self.port)
