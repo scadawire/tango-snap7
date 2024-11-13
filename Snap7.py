@@ -228,8 +228,11 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.info_stream("Connection attempted, waiting for connection result")
         else:
             self.info_stream("Not connected")
-        cpu_info = self.client.get_cpu_info()
-        print(cpu_info)
+        try:
+            cpu_info = self.client.get_cpu_info()
+            print(cpu_info)
+        except Exception as e:
+            print("cpu cmd not supported: " + str(e))
         
     def init_device(self):
         self.set_state(DevState.INIT)
