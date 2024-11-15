@@ -249,12 +249,15 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     def write_boolean_bit(self, register_parts, value):
         offset = register_parts["offset"]
+        area = register_parts["area"]
+        subarea = register_parts["subarea"]
+        bit_index = register_parts["suboffset"]
         if offset not in self.bit_byte_locks:
             with self.bit_byte_create_lock:
                 self.bit_byte_locks[offset] = Lock()
         lock = self.bit_byte_locks[offset]
         with lock: # acquire
-            data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], 1)
+            data = self.read_data_from_area_offset_size(area, subarea, offset, 1)
             byte = data[0]
             if value:
                 # Set the bit
@@ -263,7 +266,7 @@ class Snap7(Device, metaclass=DeviceMeta):
                 # Clear the bit
                 byte = byte & ~(1 << bit_index)
             data = bytearray([byte])
-            self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
+            self.write_data_to_area_offset_size(area, subarea, offset, data)
 
     def connect(self):
         self.client.connect(self.host, self.rack, self.slot, self.port)
