@@ -247,7 +247,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             data = self.variable_to_bytedata(value, variableType, register_parts["suboffset"])
             self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
 
-    def write_boolean_bit(register_parts, data):
+    def write_boolean_bit(self, register_parts, data):
         offset = register_parts["offset"]
         if offset not in self.bit_byte_locks:
             with self.bit_byte_create_lock:
