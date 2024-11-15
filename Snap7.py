@@ -182,7 +182,7 @@ class Snap7(Device, metaclass=DeviceMeta):
     def variable_to_bytedata(self, variable, variableType, suboffset):
         customLength = 0
         if(variableType == CmdArgType.DevString):
-            customLength = len(variable) + 1
+            customLength = len(variable) + 3 # two bytes for the header and one for the string termination
         data = bytearray(self.bytes_per_variable_type(variableType, customLength))
         if(variableType == CmdArgType.DevFloat):
             snap7.util.set_real(data, 0, variable)
