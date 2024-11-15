@@ -222,7 +222,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         customLength = 0
         if(variableType == CmdArgType.DevString):
             customLength = 254 # reserved default byte area size for a string on s7 devices
-        size = self.bytes_per_variable_type(variableType, customLength)
+        size = self.bytes_per_variable_type(variableType, customLength + 2)
         data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
         value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
         self.debug_stream("read value " + str(name) + ": " + str(value))
