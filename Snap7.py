@@ -182,8 +182,8 @@ class Snap7(Device, metaclass=DeviceMeta):
     def variable_to_bytedata(self, variable, variableType, suboffset):
         customLength = 0
         if(variableType == CmdArgType.DevString):
-            customLength = 254 # reserved default byte area size for a string on s7 devices
-        data = bytearray(self.bytes_per_variable_type(variableType, customLength))
+            customLength = 254 # reserved default string length is 254 / byte array requires 256 bytes
+        data = bytearray(self.bytes_per_variable_type(variableType, customLength + 2))
         if(variableType == CmdArgType.DevFloat):
             snap7.util.set_real(data, 0, variable)
         elif(variableType == CmdArgType.DevDouble):
@@ -221,7 +221,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         variableType = self.dynamicAttributes[name]["variableType"]
         customLength = 0
         if(variableType == CmdArgType.DevString):
-            customLength = 254 # reserved default byte area size for a string on s7 devices
+            customLength = 254 # reserved default string length is 254 / byte array requires 256 bytes
         size = self.bytes_per_variable_type(variableType, customLength + 2)
         data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
         value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
