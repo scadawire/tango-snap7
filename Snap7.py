@@ -36,6 +36,7 @@ from tango.server import run
 import os
 import json
 from threading import Thread
+from threading import Lock
 import datetime
 import snap7
 import re
@@ -51,6 +52,19 @@ class Snap7(Device, metaclass=DeviceMeta):
     init_dynamic_attributes = device_property(dtype=str, default_value="")
     client = snap7.client.Client()
     dynamicAttributes = {}
+    bit_byte_create_lock = Lock()
+    bit_byte_locks = {}
+
+    def get_bit_type_lock_for_offset(offset):
+        """Get or create a lock for the given offset."""
+
+    @attribute
+    def connection_state(self):
+        return self.client.get_connected()
+
+    @attribute
+    def cpu_state(self):
+        return self.client.get_cpu_state()
     
     @attribute
     def time(self):
@@ -106,10 +120,19 @@ class Snap7(Device, metaclass=DeviceMeta):
             return AttrWriteType.READ_WRITE
         raise Exception("given write_type '" + write_type_name + "' unsupported, supported are: READ, WRITE, READ_WRITE, READ_WITH_WRITE")
 
-    # TODO sync all memory in one go on fixed cron
-        
-    
-    def read_byte_from_area_offset_size(self, area, subarea, offset, size):
+    @command()
+    def plc_cold_start(self):
+        self.client.plc_cold_start()
+
+    @command()
+    def plc_hot_start(self):
+        self.client.plc_hot_start()
+
+    @command()
+    def plc_stop(self):
+        self.client.plc_stop()
+
+    def read_data_from_area_offset_size(self, area, subarea, offset, size):
         if(area == "DB"): # DB memory
             return self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
@@ -119,7 +142,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         else:
             raise Exception("unsupported area type " + area)
     
-    def write_byte_to_area_offset_size(self, area, subarea, offset, data):
+    def write_data_to_area_offset_size(self, area, subarea, offset, data):
         if(area == "DB"): # DB memory
             self.client.db_write(subarea, offset, data)
         elif(area == "E" or area == "I"): # input memory
@@ -156,7 +179,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevString):
             return customLength        
     
-    def variable_to_bytedata(self, variable, variableType):
+    def variable_to_bytedata(self, variable, variableType, suboffset):
         customLength = 0
         if(variableType == CmdArgType.DevString):
             customLength = len(variable) + 1
@@ -167,8 +190,8 @@ class Snap7(Device, metaclass=DeviceMeta):
             snap7.util.set_lreal(data, 0, variable)
         elif(variableType == CmdArgType.DevLong): # 32bit int
             snap7.util.set_dint(data, 0, variable)
-        elif(variableType == CmdArgType.DevBoolean): # attention! overrides full byte
-            snap7.util.set_bool(data, 0, variable)
+        elif(variableType == CmdArgType.DevBoolean):
+            snap7.util.set_bool(data, 0, suboffset, variable)
         elif(variableType == CmdArgType.DevString):
             snap7.util.set_string(data, 0, variable)
         else:
@@ -194,14 +217,13 @@ class Snap7(Device, metaclass=DeviceMeta):
     
     def read_dynamic_attr(self, attr):
         name = attr.get_name()
-        # value = self.dynamicAttributes[name].value TODO: once cron based implementation done use the pure value again
         register_parts = self.dynamicAttributes[name]["register_parts"]
         variableType = self.dynamicAttributes[name]["variableType"]
         customLength = 0
         if(variableType == CmdArgType.DevString):
             customLength = 254 # see also https://python-snap7.readthedocs.io/en/stable/API/util.html#snap7.util.set_string
         size = self.bytes_per_variable_type(variableType, customLength)
-        data = self.read_byte_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
+        data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
         value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
         self.debug_stream("read value " + str(name) + ": " + str(value))
         attr.set_value(value)
@@ -219,13 +241,34 @@ class Snap7(Device, metaclass=DeviceMeta):
         register_parts = self.dynamicAttributes[name]["register_parts"]
         variableType = self.dynamicAttributes[name]["variableType"]
         self.info_stream("Publish variable " + str(name) + ": " + str(value))
-        data = self.variable_to_bytedata(value, variableType)
-        self.write_byte_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
+        if(variableType == CmdArgType.DevBoolean):
+            self.write_boolean_bit(register_parts, value)
+        else:
+            data = self.variable_to_bytedata(value, variableType, register_parts["suboffset"])
+            self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
 
-    def reconnect(self):
+    def write_boolean_bit(register_parts, data):
+        offset = register_parts["offset"]
+        if offset not in self.bit_byte_locks:
+            with self.bit_byte_create_lock:
+                self.bit_byte_locks[offset] = Lock()
+        lock = self.bit_byte_locks[offset]
+        with lock: # acquire
+            data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], 1)
+            byte = data[0]
+            if value:
+                # Set the bit
+                byte = byte | (1 << bit_index)
+            else:
+                # Clear the bit
+                byte = byte & ~(1 << bit_index)
+            data = bytearray([byte])
+            self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
+
+    def connect(self):
         self.client.connect(self.host, self.rack, self.slot, self.port)
         if(self.client.get_connected()):
-            self.info_stream("Connection attempted, waiting for connection result")
+            self.info_stream("Connection established")
         else:
             self.info_stream("Not connected")
         try:
@@ -247,7 +290,7 @@ class Snap7(Device, metaclass=DeviceMeta):
                         attributeData.get("unit", ""), attributeData.get("write_type", ""))
             except JSONDecodeError as e:
                 raise e
-        self.reconnect()
+        self.connect()
         self.set_state(DevState.ON)
 
 if __name__ == "__main__":
