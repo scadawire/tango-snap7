@@ -133,6 +133,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         self.client.plc_stop()
 
     def read_data_from_area_offset_size(self, area, subarea, offset, size):
+        self.debug_stream("reading at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + size + " bytes")
         if(area == "DB"): # DB memory
             return self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
