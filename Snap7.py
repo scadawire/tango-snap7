@@ -133,7 +133,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         self.client.plc_stop()
 
     def read_data_from_area_offset_size(self, area, subarea, offset, size):
-        self.debug_stream("reading at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + size + " bytes")
+        self.debug_stream("reading at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + str(size) + " bytes")
         if(area == "DB"): # DB memory
             return self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
@@ -144,6 +144,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             raise Exception("unsupported area type " + area)
     
     def write_data_to_area_offset_size(self, area, subarea, offset, data):
+        self.debug_stream("writing at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + str(len(data)) + " bytes")
         if(area == "DB"): # DB memory
             self.client.db_write(subarea, offset, data)
         elif(area == "E" or area == "I"): # input memory
