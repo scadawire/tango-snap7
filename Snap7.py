@@ -259,16 +259,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         lock = self.bit_byte_locks[offset]
         with lock: # acquire
             data = self.read_data_from_area_offset_size(area, subarea, offset, 1)
-            byte = data[0]
-            print(f"Before: byte={byte:08b}, bit_index={bit_index}, value={value}")
-            if bool(value):
-                # Set the bit
-                byte = byte | (1 << bit_index)
-            else:
-                # Clear the bit
-                byte = byte & ~(1 << bit_index)
-            print(f"After: byte={byte:08b}")
-            data = bytearray([byte])
+            snap7.util.set_bool(data, 0, bit_index, value)
             self.write_data_to_area_offset_size(area, subarea, offset, data)
 
     def connect(self):
