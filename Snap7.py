@@ -249,6 +249,8 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
 
     def write_boolean_bit(self, register_parts, value):
+        if(value == "False"):
+            value = False
         offset = register_parts["offset"]
         area = register_parts["area"]
         subarea = register_parts["subarea"]
@@ -259,7 +261,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         lock = self.bit_byte_locks[offset]
         with lock: # acquire
             data = self.read_data_from_area_offset_size(area, subarea, offset, 1)
-            snap7.util.set_bool(data, 0, bit_index, value)
+            snap7.util.set_bool(data, 0, bit_index, bool(value))
             self.write_data_to_area_offset_size(area, subarea, offset, data)
 
     def connect(self):
