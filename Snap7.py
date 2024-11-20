@@ -162,7 +162,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevBoolean):
             return snap7.util.get_bool(data, offset, suboffset)
         elif(variableType == CmdArgType.DevString):
-            out = return snap7.util.get_string(data, offset)
+            out = snap7.util.get_string(data, offset)
             out = out.rstrip('\x00')
             if not out.isprintable():
                 raise ValueError("String contains non-printable characters.")
