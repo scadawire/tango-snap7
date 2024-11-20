@@ -62,7 +62,7 @@ class Snap7(Device, metaclass=DeviceMeta):
     def connection_state(self):
         return self.client.get_connected()
 
-    @attribute
+    @attribute(dtype=str)
     def cpu_state(self):
         return self.client.get_cpu_state()
     
