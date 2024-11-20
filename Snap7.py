@@ -177,7 +177,6 @@ class Snap7(Device, metaclass=DeviceMeta):
             return 4
         elif(variableType == CmdArgType.DevDouble):
             return 8
-            self.client.set_lreal(data, 0, variable)
         elif(variableType == CmdArgType.DevLong): # 32bit int
             return 4
         elif(variableType == CmdArgType.DevBoolean): # attention! overrides full byte
