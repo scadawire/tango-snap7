@@ -73,17 +73,21 @@ class Snap7(Device, metaclass=DeviceMeta):
     @command(dtype_in=str)
     def add_dynamic_attribute(self, register, topic, 
             variable_type_name="DevString", min_value="", max_value="",
-            unit="", write_type_name=""):
+            unit="", write_type_name="", label="", min_alarm="", max_alarm="",
+            min_warning="", max_warning=""):
         if topic == "": return
         prop = UserDefaultAttrProp()
         variableType = self.stringValueToVarType(variable_type_name)
         writeType = self.stringValueToWriteType(write_type_name)
-        if(min_value != "" and min_value != max_value): 
-            prop.set_min_value(min_value)
-        if(max_value != "" and min_value != max_value): 
-            prop.set_max_value(max_value)
-        if(unit != ""): 
-            prop.set_unit(unit)
+        if(min_value != "" and min_value != max_value): prop.set_min_value(min_value)
+        if(max_value != "" and min_value != max_value): prop.set_max_value(max_value)
+        if(unit != ""): prop.set_unit(unit)
+        if(label != ""): prop.set_label(label)
+        if(min_alarm != ""): prop.set_min_alarm(min_alarm)
+        if(max_alarm != ""): prop.set_max_alarm(max_alarm)
+        if(min_warning != ""): prop.set_min_warning(min_warning)
+        if(max_warning != ""): prop.set_max_warning(max_warning)
+
         attr = Attr(topic, variableType, writeType)
         attr.set_default_properties(prop)
         register_parts = self.get_register_parts(register)
@@ -286,7 +290,9 @@ class Snap7(Device, metaclass=DeviceMeta):
                 for attributeData in attributes:
                     self.add_dynamic_attribute(attributeData["register"], attributeData["name"], 
                         attributeData.get("data_type", ""), attributeData.get("min_value", ""), attributeData.get("max_value", ""),
-                        attributeData.get("unit", ""), attributeData.get("write_type", ""))
+                        attributeData.get("unit", ""), attributeData.get("write_type", ""), attributeData.get("label", ""),
+                        attributeData.get("min_alarm", ""), attributeData.get("max_alarm", ""),
+                        attributeData.get("min_warning", ""), attributeData.get("max_warning", ""))
             except JSONDecodeError as e:
                 raise e
         self.connect()
