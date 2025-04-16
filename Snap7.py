@@ -227,17 +227,32 @@ class Snap7(Device, metaclass=DeviceMeta):
         customLength = 0
         if(variableType == CmdArgType.DevString):
             customLength = 254 # reserved default string length is 254 / byte array requires 256 bytes
-        size = self.bytes_per_variable_type(variableType, customLength + 2)
-        data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
-        value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
-        self.debug_stream("read value " + str(name) + ": " + str(value))
-        attr.set_value(value)
+        try:
+            size = self.bytes_per_variable_type(variableType, customLength + 2)
+            data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
+            value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
+            self.debug_stream("read value " + str(name) + ": " + str(value))
+            attr.set_value(value)
+        except Exception as e:
+            self.handleReadWriteException(e)
 
     def write_dynamic_attr(self, attr):
         value = str(attr.get_write_value())
         name = attr.get_name()
         self.dynamicAttributes[name]["value"] = value
-        self.publish(name)
+        try:
+            self.publish(name)
+        except Exception as e:
+            self.handleReadWriteException(e)
+
+    def handleReadWriteException(self, e):
+        self.error_stream(f"Failed in read/write: {str(e)}")
+        requiresRestart = False
+        if "Other Socket error (32)" in {str(e)}:
+            self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
+            os._exit(1)
+        else:
+            raise e # normal error handling
 
     @command(dtype_in=[str])
     def publish(self, name):
