@@ -211,7 +211,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevBoolean):
             snap7.util.set_bool(data, 0, suboffset, variable)
         elif(variableType == CmdArgType.DevString):
-            snap7.util.set_string(data, 0, variable)
+            snap7.util.set_string(data, 0, variable, customLength)
         else:
             raise Exception("unsupported variable type " + variableType)
         return data
