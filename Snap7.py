@@ -60,7 +60,10 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     @attribute
     def connection_state(self):
-        return self.client.get_connected()
+        connected = self.client.get_connected()
+        print("client is not connected (anymore), attempt reconnect...")
+        self.connect()
+        return connected
 
     @attribute(dtype=str)
     def cpu_state(self):
@@ -246,13 +249,14 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.handleReadWriteException(e)
 
     def handleReadWriteException(self, e):
-        self.error_stream(f"Failed in read/write: {str(e)}")
-        requiresRestart = False
-        if "Other Socket error (32)" in {str(e)}:
-            self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
-            os._exit(1)
-        else:
-            raise e # normal error handling
+        raise e # normal error handling
+        # self.error_stream(f"Failed in read/write: {str(e)}")
+        # requiresRestart = False
+        # if "Other Socket error (32)" in {str(e)}:
+        #     self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
+        #     os._exit(1)
+        # else:
+        #     raise e # normal error handling
 
     @command(dtype_in=[str])
     def publish(self, name):
