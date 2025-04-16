@@ -60,9 +60,17 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     @attribute
     def connection_state(self):
-        connected = self.client.get_connected()
-        print("client is not connected (anymore), attempt reconnect...")
-        self.connect()
+        connected = False
+        try:
+            connected = self.client.get_connected()
+        except Exception as e:
+            self.error_stream(f"Failed connection state retrieval retrieve: {str(e)}")
+        if connected != True:
+            print("client is not connected (anymore), attempt reconnect...")
+            self.connect()
+            #     self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
+            #     os._exit(1)
+
         return connected
 
     @attribute(dtype=str)
@@ -230,33 +238,17 @@ class Snap7(Device, metaclass=DeviceMeta):
         customLength = 0
         if(variableType == CmdArgType.DevString):
             customLength = 254 # reserved default string length is 254 / byte array requires 256 bytes
-        try:
-            size = self.bytes_per_variable_type(variableType, customLength + 2)
-            data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
-            value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
-            self.debug_stream("read value " + str(name) + ": " + str(value))
-            attr.set_value(value)
-        except Exception as e:
-            self.handleReadWriteException(e)
+        size = self.bytes_per_variable_type(variableType, customLength + 2)
+        data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
+        value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
+        self.debug_stream("read value " + str(name) + ": " + str(value))
+        attr.set_value(value)
 
     def write_dynamic_attr(self, attr):
         value = str(attr.get_write_value())
         name = attr.get_name()
         self.dynamicAttributes[name]["value"] = value
-        try:
-            self.publish(name)
-        except Exception as e:
-            self.handleReadWriteException(e)
-
-    def handleReadWriteException(self, e):
-        raise e # normal error handling
-        # self.error_stream(f"Failed in read/write: {str(e)}")
-        # requiresRestart = False
-        # if "Other Socket error (32)" in {str(e)}:
-        #     self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
-        #     os._exit(1)
-        # else:
-        #     raise e # normal error handling
+        self.publish(name)
 
     @command(dtype_in=[str])
     def publish(self, name):
