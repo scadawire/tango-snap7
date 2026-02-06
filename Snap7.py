@@ -68,21 +68,19 @@ class Snap7(Device, metaclass=DeviceMeta):
         if connected != True:
             print("client is not connected (anymore), attempt reconnect...")
             self.connect()
-            #     self.info_stream("connection is not open (anymore), since a reconnect is insufficient, shutdown for full restart...")
-            #     os._exit(1)
 
         return connected
 
     @attribute(dtype=str)
     def cpu_state(self):
         return self.client.get_cpu_state()
-    
+
     @attribute
     def time(self):
         return time.time()
 
     @command(dtype_in=str)
-    def add_dynamic_attribute(self, register, topic, 
+    def add_dynamic_attribute(self, register, topic="",
             variable_type_name="DevString", min_value="", max_value="",
             unit="", write_type_name="", label="", min_alarm="", max_alarm="",
             min_warning="", max_warning=""):
@@ -120,7 +118,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             return CmdArgType.DevString
         if(variable_type_name == ""):
             return CmdArgType.DevString
-        raise Exception("given variable_type '" + variable_type + "' unsupported, supported are: DevBoolean, DevLong, DevDouble, DevFloat, DevString")
+        raise Exception("given variable_type '" + variable_type_name + "' unsupported, supported are: DevBoolean, DevLong, DevDouble, DevFloat, DevString")
 
     def stringValueToWriteType(self, write_type_name) -> AttrWriteType:
         if(write_type_name == "READ"):
@@ -157,7 +155,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             return self.client.ab_read(offset, size)
         else:
             raise Exception("unsupported area type " + area)
-    
+
     def write_data_to_area_offset_size(self, area, subarea, offset, data):
         self.debug_stream("writing at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + str(len(data)) + " bytes")
         if(area == "DB"): # DB memory
@@ -181,8 +179,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevString):
             return snap7.util.get_string(data, offset)
         else:
-            raise Exception("unsupported variable type " + variableType)
-    
+            raise Exception("unsupported variable type " + str(variableType))
+
     def bytes_per_variable_type(self, variableType, customLength = 0):
         if(variableType == CmdArgType.DevFloat):
             return 4
@@ -193,8 +191,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevBoolean): # attention! overrides full byte
             return 1
         elif(variableType == CmdArgType.DevString):
-            return customLength        
-    
+            return customLength
+
     def variable_to_bytedata(self, variable, variableType, suboffset):
         customLength = 0
         if(variableType == CmdArgType.DevString):
@@ -203,20 +201,29 @@ class Snap7(Device, metaclass=DeviceMeta):
                 customLength = 254 # reserved default string length is 254 / byte array requires 256 bytes
         data = bytearray(self.bytes_per_variable_type(variableType, customLength + 2))
         if(variableType == CmdArgType.DevFloat):
-            snap7.util.set_real(data, 0, variable)
+            snap7.util.set_real(data, 0, float(variable))
         elif(variableType == CmdArgType.DevDouble):
-            snap7.util.set_lreal(data, 0, variable)
+            snap7.util.set_lreal(data, 0, float(variable))
         elif(variableType == CmdArgType.DevLong): # 32bit int
-            snap7.util.set_dint(data, 0, variable)
+            snap7.util.set_dint(data, 0, int(variable))
         elif(variableType == CmdArgType.DevBoolean):
-            snap7.util.set_bool(data, 0, suboffset, variable)
+            snap7.util.set_bool(data, 0, suboffset, self._parse_boolean(variable))
         elif(variableType == CmdArgType.DevString):
-            snap7.util.set_string(data, 0, variable, customLength)
+            snap7.util.set_string(data, 0, str(variable), customLength)
         else:
-            raise Exception("unsupported variable type " + variableType)
+            raise Exception("unsupported variable type " + str(variableType))
         return data
-        
-    def get_register_parts(self, register):    
+
+    def _parse_boolean(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return bool(value)
+
+    def get_register_parts(self, register):
         area = "DB"
         subarea = 0
         offset = 0
@@ -232,7 +239,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         if(not match.group(4) is None and match.group(4) != ""):
             suboffset = int(match.group(4))
         return {"area": area, "subarea": subarea, "offset": offset, "suboffset": suboffset}
-    
+
     def read_dynamic_attr(self, attr):
         name = attr.get_name()
         register_parts = self.dynamicAttributes[name]["register_parts"]
@@ -250,12 +257,12 @@ class Snap7(Device, metaclass=DeviceMeta):
         attr.set_value(value)
 
     def write_dynamic_attr(self, attr):
-        value = str(attr.get_write_value())
+        value = attr.get_write_value()
         name = attr.get_name()
         self.dynamicAttributes[name]["value"] = value
         self.publish(name)
 
-    @command(dtype_in=[str])
+    @command(dtype_in=str)
     def publish(self, name):
         value = self.dynamicAttributes[name]["value"]
         register_parts = self.dynamicAttributes[name]["register_parts"]
@@ -268,8 +275,6 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.write_data_to_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], data)
 
     def write_boolean_bit(self, register_parts, value):
-        if(value == "False"):
-            value = False
         offset = register_parts["offset"]
         area = register_parts["area"]
         subarea = register_parts["subarea"]
@@ -280,7 +285,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         lock = self.bit_byte_locks[offset]
         with lock: # acquire
             data = self.read_data_from_area_offset_size(area, subarea, offset, 1)
-            snap7.util.set_bool(data, 0, bit_index, bool(value))
+            snap7.util.set_bool(data, 0, bit_index, self._parse_boolean(value))
             self.write_data_to_area_offset_size(area, subarea, offset, data)
 
     def connect(self):
@@ -294,7 +299,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             print(cpu_info)
         except Exception as e:
             print("cpu cmd not supported: " + str(e))
-        
+
     def init_device(self):
         self.set_state(DevState.INIT)
         self.get_device_properties(self.get_device_class())
@@ -303,7 +308,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             try:
                 attributes = json.loads(self.init_dynamic_attributes)
                 for attributeData in attributes:
-                    self.add_dynamic_attribute(attributeData["register"], attributeData["name"], 
+                    self.add_dynamic_attribute(attributeData["register"], attributeData["name"],
                         attributeData.get("data_type", ""), attributeData.get("min_value", ""), attributeData.get("max_value", ""),
                         attributeData.get("unit", ""), attributeData.get("write_type", ""), attributeData.get("label", ""),
                         attributeData.get("min_alarm", ""), attributeData.get("max_alarm", ""),
