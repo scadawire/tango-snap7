@@ -171,9 +171,12 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevLong):
             return snap7.util.get_dint(data, offset)
         elif(variableType == CmdArgType.DevBoolean):
+            if suboffset < 0 or suboffset > 7:
+                raise Exception(f"Boolean bit index must be 0-7, got {suboffset}")
             return snap7.util.get_bool(data, offset, suboffset)
         elif(variableType == CmdArgType.DevString):
-            return snap7.util.get_string(data, offset)
+            actual_len = data[offset + 1]
+            return data[offset + 2 : offset + 2 + actual_len].decode("utf-8", errors="replace")
         else:
             raise Exception("unsupported variable type " + str(variableType))
 
@@ -188,6 +191,8 @@ class Snap7(Device, metaclass=DeviceMeta):
             return 1
         elif(variableType == CmdArgType.DevString):
             return customLength
+        else:
+            raise Exception(f"Unsupported variable type: {variableType}")
 
     def variable_to_bytedata(self, variable, variableType, suboffset):
         customLength = 0
@@ -203,9 +208,16 @@ class Snap7(Device, metaclass=DeviceMeta):
         elif(variableType == CmdArgType.DevLong): # 32bit int
             snap7.util.set_dint(data, 0, int(variable))
         elif(variableType == CmdArgType.DevBoolean):
+            if suboffset < 0 or suboffset > 7:
+                raise Exception(f"Boolean bit index must be 0-7, got {suboffset}")
             snap7.util.set_bool(data, 0, suboffset, self._parse_boolean(variable))
         elif(variableType == CmdArgType.DevString):
-            snap7.util.set_string(data, 0, str(variable), customLength)
+            encoded = str(variable).encode("utf-8")
+            if len(encoded) > customLength:
+                raise Exception(f"String is {len(encoded)} bytes (UTF-8), exceeds max {customLength}")
+            data[0] = customLength
+            data[1] = len(encoded)
+            data[2:2 + len(encoded)] = encoded
         else:
             raise Exception("unsupported variable type " + str(variableType))
         return data
@@ -275,6 +287,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         area = register_parts["area"]
         subarea = register_parts["subarea"]
         bit_index = register_parts["suboffset"]
+        if bit_index < 0 or bit_index > 7:
+            raise Exception(f"Boolean bit index must be 0-7, got {bit_index}")
         if offset not in self.bit_byte_locks:
             with self.bit_byte_create_lock:
                 self.bit_byte_locks[offset] = Lock()

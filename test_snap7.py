@@ -299,6 +299,17 @@ def test_bytes_per_variable_type():
     assert_equal("string size 10", Snap7.bytes_per_variable_type(s, CmdArgType.DevString, 10), 10)
     assert_equal("string size 256", Snap7.bytes_per_variable_type(s, CmdArgType.DevString, 256), 256)
 
+    # unsupported type raises
+    global passed, failed
+    try:
+        Snap7.bytes_per_variable_type(s, CmdArgType.DevShort)
+        failed += 1
+        errors.append("  FAIL  unsupported type: expected exception")
+        print("  FAIL  unsupported type: expected exception")
+    except Exception:
+        passed += 1
+        print("  PASS  unsupported type raises")
+
 
 def test_byte_conversions():
     print("\n-- byte conversions (round-trip) --")
@@ -369,6 +380,83 @@ def test_byte_conversions():
     enc = Snap7.variable_to_bytedata(s, "Test123!@#", CmdArgType.DevString, 20)
     dec = Snap7.bytedata_to_variable(s, enc, CmdArgType.DevString)
     assert_equal("DevString special chars", dec, "Test123!@#")
+
+    # UTF-8: degree symbol (2 bytes in UTF-8)
+    enc = Snap7.variable_to_bytedata(s, "25\u00b0C", CmdArgType.DevString, 20)
+    dec = Snap7.bytedata_to_variable(s, enc, CmdArgType.DevString)
+    assert_equal("DevString UTF-8 degree", dec, "25\u00b0C")
+
+    # UTF-8: multi-byte characters
+    enc = Snap7.variable_to_bytedata(s, "\u00e4\u00f6\u00fc", CmdArgType.DevString, 20)
+    dec = Snap7.bytedata_to_variable(s, enc, CmdArgType.DevString)
+    assert_equal("DevString UTF-8 umlauts", dec, "\u00e4\u00f6\u00fc")
+
+
+def test_validation_edge_cases():
+    print("\n-- validation edge cases --")
+    s = State()
+    global passed, failed
+
+    # String too long raises
+    try:
+        Snap7.variable_to_bytedata(s, "Hello World!", CmdArgType.DevString, 5)
+        failed += 1
+        errors.append("  FAIL  string too long: expected exception")
+        print("  FAIL  string too long: expected exception")
+    except Exception as e:
+        passed += 1
+        print(f"  PASS  string too long raises: {e}")
+
+    # String exactly at max succeeds
+    enc = Snap7.variable_to_bytedata(s, "12345", CmdArgType.DevString, 5)
+    dec = Snap7.bytedata_to_variable(s, enc, CmdArgType.DevString)
+    assert_equal("string at exact max", dec, "12345")
+
+    # UTF-8 string byte count exceeds max (3 chars but 6 UTF-8 bytes)
+    try:
+        Snap7.variable_to_bytedata(s, "\u00e4\u00f6\u00fc", CmdArgType.DevString, 5)
+        failed += 1
+        errors.append("  FAIL  UTF-8 byte overflow: expected exception")
+        print("  FAIL  UTF-8 byte overflow: expected exception")
+    except Exception as e:
+        passed += 1
+        print(f"  PASS  UTF-8 byte overflow raises: {e}")
+
+    # Boolean bit index 8 raises on encode
+    try:
+        Snap7.variable_to_bytedata(s, True, CmdArgType.DevBoolean, 8)
+        failed += 1
+        errors.append("  FAIL  bit index 8 encode: expected exception")
+        print("  FAIL  bit index 8 encode: expected exception")
+    except Exception as e:
+        passed += 1
+        print(f"  PASS  bit index 8 encode raises: {e}")
+
+    # Boolean bit index 8 raises on decode
+    try:
+        data = bytearray(1)
+        Snap7.bytedata_to_variable(s, data, CmdArgType.DevBoolean, 0, 8)
+        failed += 1
+        errors.append("  FAIL  bit index 8 decode: expected exception")
+        print("  FAIL  bit index 8 decode: expected exception")
+    except Exception as e:
+        passed += 1
+        print(f"  PASS  bit index 8 decode raises: {e}")
+
+    # Boolean bit index -1 raises
+    try:
+        Snap7.variable_to_bytedata(s, True, CmdArgType.DevBoolean, -1)
+        failed += 1
+        errors.append("  FAIL  bit index -1: expected exception")
+        print("  FAIL  bit index -1: expected exception")
+    except Exception as e:
+        passed += 1
+        print(f"  PASS  bit index -1 raises: {e}")
+
+    # Boolean bit index 7 succeeds (boundary)
+    enc = Snap7.variable_to_bytedata(s, True, CmdArgType.DevBoolean, 7)
+    dec = Snap7.bytedata_to_variable(s, enc, CmdArgType.DevBoolean, 0, 7)
+    assert_true("bit index 7 boundary", dec)
 
 
 # ===========================================================================
@@ -495,6 +583,35 @@ def test_db_string_default_length(s):
     write_attr(s, "db_str_dflt", val)
     got = read_attr(s, "db_str_dflt")
     assert_equal("DB default-length string", got, val)
+
+
+def test_db_string_utf8(s):
+    print("\n-- DB: DevString UTF-8 --")
+    register_attr(s, "db_str_utf8", "DB1.340.30", CmdArgType.DevString)
+
+    # Degree symbol (2 bytes in UTF-8)
+    val = "25\u00b0C"
+    write_attr(s, "db_str_utf8", val)
+    got = read_attr(s, "db_str_utf8")
+    assert_equal("DB UTF-8 degree", got, val)
+
+    # German umlauts (2 bytes each in UTF-8)
+    val = "\u00e4\u00f6\u00fc\u00df"
+    write_attr(s, "db_str_utf8", val)
+    got = read_attr(s, "db_str_utf8")
+    assert_equal("DB UTF-8 umlauts", got, val)
+
+    # Mixed ASCII and multi-byte
+    val = "Caf\u00e9"
+    write_attr(s, "db_str_utf8", val)
+    got = read_attr(s, "db_str_utf8")
+    assert_equal("DB UTF-8 mixed", got, val)
+
+    # Overwrite with plain ASCII
+    val = "plain"
+    write_attr(s, "db_str_utf8", val)
+    got = read_attr(s, "db_str_utf8")
+    assert_equal("DB UTF-8 then ASCII", got, val)
 
 
 # ===========================================================================
@@ -657,6 +774,7 @@ def main():
     test_parse_boolean()
     test_bytes_per_variable_type()
     test_byte_conversions()
+    test_validation_edge_cases()
 
     # -- start snap7 server --
     print("\n== Starting Snap7 server simulator on port", SIM_PORT, "==")
@@ -686,6 +804,7 @@ def main():
         test_db_boolean_parse_variants(s)
         test_db_string(s)
         test_db_string_default_length(s)
+        test_db_string_utf8(s)
 
         # -- Input area tests (pre-seeded) --
         test_input_area_float(s)
