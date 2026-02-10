@@ -43,7 +43,6 @@ import re
 from json import JSONDecodeError
 
 class Snap7(Device, metaclass=DeviceMeta):
-    pass
 
     host = device_property(dtype=str, default_value="127.0.0.1")
     rack = device_property(dtype=int, default_value=0)
@@ -55,9 +54,6 @@ class Snap7(Device, metaclass=DeviceMeta):
     bit_byte_create_lock = Lock()
     bit_byte_locks = {}
 
-    def get_bit_type_lock_for_offset(offset):
-        """Get or create a lock for the given offset."""
-
     @attribute
     def connection_state(self):
         connected = False
@@ -66,7 +62,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         except Exception as e:
             self.error_stream(f"Failed connection state retrieval retrieve: {str(e)}")
         if connected != True:
-            print("client is not connected (anymore), attempt reconnect...")
+            self.warn_stream("client is not connected (anymore), attempt reconnect...")
             self.connect()
 
         return connected
@@ -102,8 +98,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         register_parts = self.get_register_parts(register)
         self.add_attribute(attr, r_meth=self.read_dynamic_attr, w_meth=self.write_dynamic_attr)
         self.dynamicAttributes[topic] = {"variableType": variableType, "register": register, "register_parts": register_parts, "value": 0 }
-        print("added dynamic attribute " + topic)
-        print(self.dynamicAttributes[topic])
+        self.info_stream("added dynamic attribute " + topic)
+        self.debug_stream(str(self.dynamicAttributes[topic]))
 
     def stringValueToVarType(self, variable_type_name) -> CmdArgType:
         if(variable_type_name == "DevBoolean"):
@@ -214,7 +210,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             raise Exception("unsupported variable type " + str(variableType))
         return data
 
-    def _parse_boolean(value):
+    def _parse_boolean(self, value):
         if isinstance(value, bool):
             return value
         if isinstance(value, (int, float)):
@@ -289,16 +285,30 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.write_data_to_area_offset_size(area, subarea, offset, data)
 
     def connect(self):
-        self.client.connect(self.host, self.rack, self.slot, self.port)
-        if(self.client.get_connected()):
-            self.info_stream("Connection established")
-        else:
-            self.info_stream("Not connected")
         try:
-            cpu_info = self.client.get_cpu_info()
-            print(cpu_info)
+            self.client.connect(self.host, self.rack, self.slot, self.port)
+            if self.client.get_connected():
+                self.info_stream("Connection established")
+            else:
+                self.error_stream("Connection failed")
+                self.set_state(DevState.FAULT)
+                return
+            try:
+                cpu_info = self.client.get_cpu_info()
+                self.debug_stream(str(cpu_info))
+            except Exception as e:
+                self.debug_stream("cpu cmd not supported: " + str(e))
         except Exception as e:
-            print("cpu cmd not supported: " + str(e))
+            self.error_stream(f"Connection error: {e}")
+            self.set_state(DevState.FAULT)
+
+    def delete_device(self):
+        try:
+            if self.client.get_connected():
+                self.client.disconnect()
+                self.info_stream("Disconnected from PLC")
+        except Exception as e:
+            self.error_stream(f"Error during disconnect: {e}")
 
     def init_device(self):
         self.set_state(DevState.INIT)
@@ -314,9 +324,10 @@ class Snap7(Device, metaclass=DeviceMeta):
                         attributeData.get("min_alarm", ""), attributeData.get("max_alarm", ""),
                         attributeData.get("min_warning", ""), attributeData.get("max_warning", ""))
             except JSONDecodeError as e:
-                raise e
+                self.error_stream(f"Failed to parse init_dynamic_attributes JSON: {e}")
         self.connect()
-        self.set_state(DevState.ON)
+        if self.get_state() != DevState.FAULT:
+            self.set_state(DevState.ON)
 
 if __name__ == "__main__":
     deviceServerName = os.getenv("DEVICE_SERVER_NAME")
