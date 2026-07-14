@@ -60,7 +60,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         try:
             connected = self.client.get_connected()
         except Exception as e:
-            self.error_stream(f"Failed connection state retrieval retrieve: {str(e)}")
+            self.error_stream("Failed connection state retrieval retrieve: %s", str(e))
         if connected != True:
             self.warn_stream("client is not connected (anymore), attempt reconnect...")
             self.connect()
@@ -98,8 +98,8 @@ class Snap7(Device, metaclass=DeviceMeta):
         register_parts = self.get_register_parts(register)
         self.add_attribute(attr, r_meth=self.read_dynamic_attr, w_meth=self.write_dynamic_attr)
         self.dynamicAttributes[topic] = {"variableType": variableType, "register": register, "register_parts": register_parts, "value": 0 }
-        self.info_stream("added dynamic attribute " + topic)
-        self.debug_stream(str(self.dynamicAttributes[topic]))
+        self.info_stream("added dynamic attribute %s", topic)
+        self.debug_stream("%s", str(self.dynamicAttributes[topic]))
 
     def stringValueToVarType(self, variable_type_name) -> CmdArgType:
         if(variable_type_name == "DevBoolean"):
@@ -142,7 +142,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         self.client.plc_stop()
 
     def read_data_from_area_offset_size(self, area, subarea, offset, size):
-        self.debug_stream("reading at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + str(size) + " bytes")
+        self.debug_stream("reading at %s / %s offset %s: %s bytes", area, subarea, offset, size)
         if(area == "DB"): # DB memory
             return self.client.db_read(subarea, offset, size)
         elif(area == "E" or area == "I"): # input memory
@@ -153,7 +153,7 @@ class Snap7(Device, metaclass=DeviceMeta):
             raise Exception("unsupported area type " + area)
 
     def write_data_to_area_offset_size(self, area, subarea, offset, data):
-        self.debug_stream("writing at " + str(area) + " / " + str(subarea) +  " offset " + str(offset) + ":  " + str(len(data)) + " bytes")
+        self.debug_stream("writing at %s / %s offset %s: %s bytes", area, subarea, offset, len(data))
         if(area == "DB"): # DB memory
             self.client.db_write(subarea, offset, data)
         elif(area == "E" or area == "I"): # input memory
@@ -261,7 +261,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         size = self.bytes_per_variable_type(variableType, customLength + 2)
         data = self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], size)
         value = self.bytedata_to_variable(data, variableType, 0, register_parts["suboffset"])
-        self.debug_stream("read value " + str(name) + ": " + str(value))
+        self.debug_stream("read value %s: %s", name, value)
         attr.set_value(value)
 
     def write_dynamic_attr(self, attr):
@@ -275,7 +275,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         value = self.dynamicAttributes[name]["value"]
         register_parts = self.dynamicAttributes[name]["register_parts"]
         variableType = self.dynamicAttributes[name]["variableType"]
-        self.info_stream("Publish variable " + str(name) + ": " + str(value))
+        self.debug_stream("Publish variable %s: %s", name, value)
         if(variableType == CmdArgType.DevBoolean):
             self.write_boolean_bit(register_parts, value)
         else:
@@ -309,11 +309,11 @@ class Snap7(Device, metaclass=DeviceMeta):
                 return
             try:
                 cpu_info = self.client.get_cpu_info()
-                self.debug_stream(str(cpu_info))
+                self.debug_stream("%s", str(cpu_info))
             except Exception as e:
-                self.debug_stream("cpu cmd not supported: " + str(e))
+                self.debug_stream("cpu cmd not supported: %s", str(e))
         except Exception as e:
-            self.error_stream(f"Connection error: {e}")
+            self.error_stream("Connection error: %s", e)
             self.set_state(DevState.FAULT)
 
     def delete_device(self):
@@ -322,12 +322,12 @@ class Snap7(Device, metaclass=DeviceMeta):
                 self.client.disconnect()
                 self.info_stream("Disconnected from PLC")
         except Exception as e:
-            self.error_stream(f"Error during disconnect: {e}")
+            self.error_stream("Error during disconnect: %s", e)
 
     def init_device(self):
         self.set_state(DevState.INIT)
         self.get_device_properties(self.get_device_class())
-        self.info_stream("Connecting to " + str(self.host) + ":" + str(self.port))
+        self.info_stream("Connecting to %s:%s", self.host, self.port)
         if self.init_dynamic_attributes != "":
             try:
                 attributes = json.loads(self.init_dynamic_attributes)
@@ -338,7 +338,7 @@ class Snap7(Device, metaclass=DeviceMeta):
                         attributeData.get("min_alarm", ""), attributeData.get("max_alarm", ""),
                         attributeData.get("min_warning", ""), attributeData.get("max_warning", ""))
             except JSONDecodeError as e:
-                self.error_stream(f"Failed to parse init_dynamic_attributes JSON: {e}")
+                self.error_stream("Failed to parse init_dynamic_attributes JSON: %s", e)
         self.connect()
         if self.get_state() != DevState.FAULT:
             self.set_state(DevState.ON)

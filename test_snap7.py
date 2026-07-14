@@ -44,10 +44,12 @@ class State:
         self.bit_byte_create_lock = Lock()
         self.bit_byte_locks = {}
 
-    def info_stream(self, msg): pass
-    def debug_stream(self, msg): pass
-    def warn_stream(self, msg): pass
-    def error_stream(self, msg): pass
+    # mirror pytango: the message is rendered as `msg % args`, so a format
+    # mismatch (a stray % in the payload) raises here just as it would live
+    def info_stream(self, msg, *args): msg % args
+    def debug_stream(self, msg, *args): msg % args
+    def warn_stream(self, msg, *args): msg % args
+    def error_stream(self, msg, *args): msg % args
 
     def __getattr__(self, name):
         import functools
