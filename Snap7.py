@@ -97,6 +97,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         attr.set_default_properties(prop)
         register_parts = self.get_register_parts(register)
         self.add_attribute(attr, r_meth=self.read_dynamic_attr, w_meth=self.write_dynamic_attr)
+        self.set_change_event(topic, True, False)
         self.dynamicAttributes[topic] = {"variableType": variableType, "register": register, "register_parts": register_parts, "value": 0 }
         self.info_stream("added dynamic attribute %s", topic)
         self.debug_stream("%s", str(self.dynamicAttributes[topic]))
@@ -269,6 +270,7 @@ class Snap7(Device, metaclass=DeviceMeta):
         name = attr.get_name()
         self.dynamicAttributes[name]["value"] = value
         self.publish(name)
+        self.push_change_event(name, value)
 
     @command(dtype_in=str)
     def publish(self, name):
