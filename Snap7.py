@@ -37,6 +37,7 @@ import os
 import json
 from threading import Thread
 from threading import Lock
+from threading import Event
 import datetime
 import snap7
 import re
@@ -49,10 +50,16 @@ class Snap7(Device, metaclass=DeviceMeta):
     slot = device_property(dtype=int, default_value=0)
     port = device_property(dtype=int, default_value=102)
     init_dynamic_attributes = device_property(dtype=str, default_value="")
+    health_check_interval = device_property(dtype=float, default_value=2.0)
     client = snap7.client.Client()
     dynamicAttributes = {}
     bit_byte_create_lock = Lock()
     bit_byte_locks = {}
+    # serialises access to the snap7 client, which is not safe for concurrent operations - the health
+    # monitor probes it from its own thread while tango reads/writes it from the request threads
+    client_lock = Lock()
+    _health_thread = None
+    _health_stop = None
 
     @attribute
     def connection_state(self):
@@ -144,25 +151,27 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     def read_data_from_area_offset_size(self, area, subarea, offset, size):
         self.debug_stream("reading at %s / %s offset %s: %s bytes", area, subarea, offset, size)
-        if(area == "DB"): # DB memory
-            return self.client.db_read(subarea, offset, size)
-        elif(area == "E" or area == "I"): # input memory
-            return self.client.eb_read(offset, size)
-        elif(area == "A" or area == "Q"): # output memory
-            return self.client.ab_read(offset, size)
-        else:
-            raise Exception("unsupported area type " + area)
+        with self.client_lock:
+            if(area == "DB"): # DB memory
+                return self.client.db_read(subarea, offset, size)
+            elif(area == "E" or area == "I"): # input memory
+                return self.client.eb_read(offset, size)
+            elif(area == "A" or area == "Q"): # output memory
+                return self.client.ab_read(offset, size)
+            else:
+                raise Exception("unsupported area type " + area)
 
     def write_data_to_area_offset_size(self, area, subarea, offset, data):
         self.debug_stream("writing at %s / %s offset %s: %s bytes", area, subarea, offset, len(data))
-        if(area == "DB"): # DB memory
-            self.client.db_write(subarea, offset, data)
-        elif(area == "E" or area == "I"): # input memory
-            self.client.eb_write(offset, data)
-        elif(area == "A" or area == "Q"): # output memory
-            self.client.ab_write(offset, data)
-        else:
-            raise Exception("unsupported area type " + area)
+        with self.client_lock:
+            if(area == "DB"): # DB memory
+                self.client.db_write(subarea, offset, data)
+            elif(area == "E" or area == "I"): # input memory
+                self.client.eb_write(offset, data)
+            elif(area == "A" or area == "Q"): # output memory
+                self.client.ab_write(offset, data)
+            else:
+                raise Exception("unsupported area type " + area)
 
     def bytedata_to_variable(self, data, variableType, offset = 0, suboffset = 0):
         if(variableType == CmdArgType.DevFloat):
@@ -302,15 +311,22 @@ class Snap7(Device, metaclass=DeviceMeta):
 
     def connect(self):
         try:
-            self.client.connect(self.host, self.rack, self.slot, self.port)
-            if self.client.get_connected():
+            with self.client_lock:
+                try:
+                    self.client.disconnect()  # drop any stale socket before reconnecting
+                except Exception:
+                    pass
+                self.client.connect(self.host, self.rack, self.slot, self.port)
+                connected = self.client.get_connected()
+            if connected:
                 self.info_stream("Connection established")
             else:
                 self.error_stream("Connection failed")
                 self.set_state(DevState.FAULT)
                 return
             try:
-                cpu_info = self.client.get_cpu_info()
+                with self.client_lock:
+                    cpu_info = self.client.get_cpu_info()
                 self.debug_stream("%s", str(cpu_info))
             except Exception as e:
                 self.debug_stream("cpu cmd not supported: %s", str(e))
@@ -318,11 +334,50 @@ class Snap7(Device, metaclass=DeviceMeta):
             self.error_stream("Connection error: %s", e)
             self.set_state(DevState.FAULT)
 
-    def delete_device(self):
+    def health_probe(self):
+        """A real round trip to the plc, so a dropped connection is noticed: get_connected() and
+        get_cpu_state() keep reporting a healthy socket after the peer is gone, only an actual read
+        raises. Probes the first configured register, or the connection flag when none is set."""
         try:
-            if self.client.get_connected():
-                self.client.disconnect()
-                self.info_stream("Disconnected from PLC")
+            with self.client_lock:
+                if not self.client.get_connected():
+                    return False
+        except Exception:
+            return False
+        for meta in self.dynamicAttributes.values():
+            register_parts = meta["register_parts"]
+            try:
+                self.read_data_from_area_offset_size(register_parts["area"], register_parts["subarea"], register_parts["offset"], 1)
+                return True
+            except Exception:
+                return False
+        return True  # no attributes to probe with, the connection flag above is all there is
+
+    def health_loop(self):
+        while not self._health_stop.wait(self.health_check_interval):
+            if self.health_probe():
+                if self.get_state() == DevState.FAULT:
+                    self.info_stream("Connection to plc recovered")
+                    self.set_state(DevState.ON)
+            else:
+                if self.get_state() != DevState.FAULT:
+                    self.warn_stream("Connection to plc lost, going to FAULT and attempting reconnect")
+                    self.set_state(DevState.FAULT)
+                self.connect()  # sets ON again below once the probe succeeds
+
+    def start_health_monitor(self):
+        self._health_stop = Event()
+        self._health_thread = Thread(target=self.health_loop, daemon=True)
+        self._health_thread.start()
+
+    def delete_device(self):
+        if self._health_stop is not None:
+            self._health_stop.set()
+        try:
+            with self.client_lock:
+                if self.client.get_connected():
+                    self.client.disconnect()
+                    self.info_stream("Disconnected from PLC")
         except Exception as e:
             self.error_stream("Error during disconnect: %s", e)
 
@@ -344,6 +399,9 @@ class Snap7(Device, metaclass=DeviceMeta):
         self.connect()
         if self.get_state() != DevState.FAULT:
             self.set_state(DevState.ON)
+        # keep watching the connection: go to FAULT if the plc drops off and back to ON when it
+        # returns, so a lost connection is visible and recovers on its own
+        self.start_health_monitor()
 
 if __name__ == "__main__":
     deviceServerName = os.getenv("DEVICE_SERVER_NAME")
