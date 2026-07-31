@@ -253,14 +253,23 @@ def test_string_value_to_write_type():
         ("READ", AttrWriteType.READ),
         ("WRITE", AttrWriteType.WRITE),
         ("READ_WRITE", AttrWriteType.READ_WRITE),
-        ("READ_WITH_WRITE", AttrWriteType.READ_WITH_WRITE),
         ("", AttrWriteType.READ_WRITE),
     ]:
         got = Snap7.stringValueToWriteType(s, name)
         assert_equal(f"writeType '{name}'", got, expected)
 
-    # unsupported raises
+    # not offered: tango needs an associated write attribute for it, which no driver defines
     global passed, failed
+    try:
+        Snap7.stringValueToWriteType(s, "READ_WITH_WRITE")
+        failed += 1
+        errors.append("  FAIL  writeType READ_WITH_WRITE: expected exception")
+        print("  FAIL  writeType READ_WITH_WRITE: expected exception")
+    except Exception:
+        passed += 1
+        print("  PASS  writeType READ_WITH_WRITE rejected")
+
+    # unsupported raises
     try:
         Snap7.stringValueToWriteType(s, "BOGUS")
         failed += 1
